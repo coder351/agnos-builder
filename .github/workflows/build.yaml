@@ -2,14 +2,12 @@ name: build
 
 on:
   push:
-    # branches: [ master ]
-    branches: [ pyenvtouv ]
+    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
 concurrency:
-  # group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
-  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/pyenvtouv' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -22,6 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 512
+        swap-size-mb: 1024
+        remove-dotnet: 'true'
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build
+      run: |
+        echo "Free space:"
+        df -h        
     - uses: actions/checkout@v4
       with:
         lfs: true
