@@ -50,6 +50,8 @@ CONTAINER_ID=$(docker container create --entrypoint /bin/bash agnos-builder:late
 
 # Setup mount container for macOS and CI support (namespace.so)
 echo "Building agnos-meta-builder docker image"
+docker system prune -af
+RUN df -h 
 docker build -f Dockerfile.builder -t agnos-meta-builder $DIR \
   --build-arg UNAME=$(id -nu) \
   --build-arg UID=$(id -u) \
