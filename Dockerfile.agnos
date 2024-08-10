@@ -3,7 +3,8 @@
 # ################## #
 FROM scratch AS agnos-base
 ADD ubuntu-base-20.04.1-base-arm64.tar.gz /
-
+Run apt-get clean
+RUN apt-get autoremove && df -h
 # Add aarch64 and arm support
 COPY --from=multiarch/qemu-user-static:x86_64-aarch64 /usr/bin/qemu-aarch64-static /usr/bin
 COPY --from=multiarch/qemu-user-static:x86_64-arm /usr/bin/qemu-arm-static /usr/bin
@@ -32,7 +33,6 @@ RUN apt-get update && apt-get install --no-install-recommends checkinstall
 # Install openpilot dependencies, probably needed for build,
 # but we don't want these in the base image
 COPY ./userspace/openpilot_dependencies.sh /tmp/agnos/
-RUN apt-get autoremove && df -h
 RUN /tmp/agnos/openpilot_dependencies.sh
 
 # Individual compiling images
