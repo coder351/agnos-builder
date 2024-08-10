@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install --no-install-recommends checkinstall
 # Install openpilot dependencies, probably needed for build,
 # but we don't want these in the base image
 COPY ./userspace/openpilot_dependencies.sh /tmp/agnos/
+RUN apt-get autoremove && df -h
 RUN /tmp/agnos/openpilot_dependencies.sh
 
 # Individual compiling images
