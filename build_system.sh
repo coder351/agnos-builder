@@ -52,81 +52,81 @@ CONTAINER_ID=$(docker container create --entrypoint /bin/bash agnos-builder:late
 echo "Building agnos-meta-builder docker image"
 docker system prune -af
 RUN df -h 
-docker build -f Dockerfile.builder -t agnos-meta-builder $DIR \
-  --build-arg UNAME=$(id -nu) \
-  --build-arg UID=$(id -u) \
-  --build-arg GID=$(id -g)
-echo "Starting agnos-meta-builder container"
-MOUNT_CONTAINER_ID=$(docker run -d --privileged -v $DIR:$DIR agnos-meta-builder)
+# docker build -f Dockerfile.builder -t agnos-meta-builder $DIR \
+#   --build-arg UNAME=$(id -nu) \
+#   --build-arg UID=$(id -u) \
+#   --build-arg GID=$(id -g)
+# echo "Starting agnos-meta-builder container"
+# MOUNT_CONTAINER_ID=$(docker run -d --privileged -v $DIR:$DIR agnos-meta-builder)
 
-# Cleanup containers on possible exit
-trap "echo \"Cleaning up containers:\"; \
-docker container rm -f $CONTAINER_ID $MOUNT_CONTAINER_ID" EXIT
+# # Cleanup containers on possible exit
+# trap "echo \"Cleaning up containers:\"; \
+# docker container rm -f $CONTAINER_ID $MOUNT_CONTAINER_ID" EXIT
 
-# Define functions for docker execution
-exec_as_user() {
-  docker exec -u $(id -nu) $MOUNT_CONTAINER_ID "$@"
-}
+# # Define functions for docker execution
+# exec_as_user() {
+#   docker exec -u $(id -nu) $MOUNT_CONTAINER_ID "$@"
+# }
 
-exec_as_root() {
-  docker exec $MOUNT_CONTAINER_ID "$@"
-}
+# exec_as_root() {
+#   docker exec $MOUNT_CONTAINER_ID "$@"
+# }
 
-# Create filesystem ext4 image
-echo "Creating empty filesystem"
-exec_as_user fallocate -l $ROOTFS_IMAGE_SIZE $ROOTFS_IMAGE
-exec_as_user mkfs.ext4 $ROOTFS_IMAGE &> /dev/null
+# # Create filesystem ext4 image
+# echo "Creating empty filesystem"
+# exec_as_user fallocate -l $ROOTFS_IMAGE_SIZE $ROOTFS_IMAGE
+# exec_as_user mkfs.ext4 $ROOTFS_IMAGE &> /dev/null
 
-# Mount filesystem
-echo "Mounting empty filesystem"
-exec_as_root mkdir -p $ROOTFS_DIR
-exec_as_root mount $ROOTFS_IMAGE $ROOTFS_DIR
+# # Mount filesystem
+# echo "Mounting empty filesystem"
+# exec_as_root mkdir -p $ROOTFS_DIR
+# exec_as_root mount $ROOTFS_IMAGE $ROOTFS_DIR
 
-# Also unmount filesystem (overwrite previous trap)
-trap "exec_as_root umount -l $ROOTFS_DIR &> /dev/null || true; \
-echo \"Cleaning up containers:\"; \
-docker container rm -f $CONTAINER_ID $MOUNT_CONTAINER_ID" EXIT
+# # Also unmount filesystem (overwrite previous trap)
+# trap "exec_as_root umount -l $ROOTFS_DIR &> /dev/null || true; \
+# echo \"Cleaning up containers:\"; \
+# docker container rm -f $CONTAINER_ID $MOUNT_CONTAINER_ID" EXIT
 
-# Extract image
-echo "Extracting docker image"
-docker container export -o $BUILD_DIR/filesystem.tar $CONTAINER_ID
-exec_as_root tar -xf $BUILD_DIR/filesystem.tar -C $ROOTFS_DIR > /dev/null
+# # Extract image
+# echo "Extracting docker image"
+# docker container export -o $BUILD_DIR/filesystem.tar $CONTAINER_ID
+# exec_as_root tar -xf $BUILD_DIR/filesystem.tar -C $ROOTFS_DIR > /dev/null
 
-echo "Setting network stuff"
-set_network_stuff() {
-  cd $ROOTFS_DIR
-  # Add hostname and hosts. This cannot be done in the docker container...
-  HOST=comma
-  bash -c "ln -sf /proc/sys/kernel/hostname etc/hostname"
-  bash -c "echo \"127.0.0.1    localhost.localdomain localhost\" > etc/hosts"
-  bash -c "echo \"127.0.0.1    $HOST\" >> etc/hosts"
+# echo "Setting network stuff"
+# set_network_stuff() {
+#   cd $ROOTFS_DIR
+#   # Add hostname and hosts. This cannot be done in the docker container...
+#   HOST=comma
+#   bash -c "ln -sf /proc/sys/kernel/hostname etc/hostname"
+#   bash -c "echo \"127.0.0.1    localhost.localdomain localhost\" > etc/hosts"
+#   bash -c "echo \"127.0.0.1    $HOST\" >> etc/hosts"
 
-  # Fix resolv config
-  bash -c "ln -sf /run/systemd/resolve/stub-resolv.conf etc/resolv.conf"
+#   # Fix resolv config
+#   bash -c "ln -sf /run/systemd/resolve/stub-resolv.conf etc/resolv.conf"
 
-  # Write build info
-  DATETIME=$(date '+%Y-%m-%dT%H:%M:%S')
-  bash -c "printf \"$GIT_HASH\n$DATETIME\" > BUILD"
-}
-GIT_HASH=$(git --git-dir=$DIR/.git rev-parse HEAD)
-exec_as_root bash -c "set -e; export ROOTFS_DIR=$ROOTFS_DIR GIT_HASH=$GIT_HASH; $(declare -f set_network_stuff); set_network_stuff"
+#   # Write build info
+#   DATETIME=$(date '+%Y-%m-%dT%H:%M:%S')
+#   bash -c "printf \"$GIT_HASH\n$DATETIME\" > BUILD"
+# }
+# GIT_HASH=$(git --git-dir=$DIR/.git rev-parse HEAD)
+# exec_as_root bash -c "set -e; export ROOTFS_DIR=$ROOTFS_DIR GIT_HASH=$GIT_HASH; $(declare -f set_network_stuff); set_network_stuff"
 
-# Unmount image
-echo "Unmount filesystem"
-exec_as_root umount -l $ROOTFS_DIR
+# # Unmount image
+# echo "Unmount filesystem"
+# exec_as_root umount -l $ROOTFS_DIR
 
-# Sparsify
-echo "Sparsify image $(basename $SPARSE_IMAGE)"
-exec_as_user bash -c "\
-TMP_SPARSE=\$(mktemp); \
-img2simg $ROOTFS_IMAGE \$TMP_SPARSE; \
-mv \$TMP_SPARSE $SPARSE_IMAGE"
+# # Sparsify
+# echo "Sparsify image $(basename $SPARSE_IMAGE)"
+# exec_as_user bash -c "\
+# TMP_SPARSE=\$(mktemp); \
+# img2simg $ROOTFS_IMAGE \$TMP_SPARSE; \
+# mv \$TMP_SPARSE $SPARSE_IMAGE"
 
-# Make image with skipped chunks
-echo "Sparsify image $(basename $SKIP_CHUNKS_IMAGE)"
-exec_as_user bash -c "\
-TMP_SKIP=\$(mktemp); \
-$DIR/tools/simg2dontcare.py $SPARSE_IMAGE \$TMP_SKIP; \
-mv \$TMP_SKIP $SKIP_CHUNKS_IMAGE"
+# # Make image with skipped chunks
+# echo "Sparsify image $(basename $SKIP_CHUNKS_IMAGE)"
+# exec_as_user bash -c "\
+# TMP_SKIP=\$(mktemp); \
+# $DIR/tools/simg2dontcare.py $SPARSE_IMAGE \$TMP_SKIP; \
+# mv \$TMP_SKIP $SKIP_CHUNKS_IMAGE"
 
 echo "Done!"
